@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte des CGV BC Maintenance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a mind map read from the centre outwards, 4 branches each side,
+   a fiche drawer on the right for the selected clause, decisions listed under the map. */
+:root{
+  --bg:#f2f4f7; --surface:#ffffff; --ink:#111c38; --muted:#5b6682; --line:#c9d0de;
+  --navy:#1c2f6e; --green:#2c8a3c;
+  --loi:#c2410c; --metier:#1c2f6e; --utile:#2c8a3c; --option:#7b849a;
+  --font-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0d1326; --surface:#161e38; --ink:#e8ecf6; --muted:#9aa5c2; --line:#34406a;
+    --navy:#8ea6ff; --green:#5fc472;
+    --loi:#ff9361; --metier:#8ea6ff; --utile:#5fc472; --option:#8a93ab;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0d1326; --surface:#161e38; --ink:#e8ecf6; --muted:#9aa5c2; --line:#34406a;
+  --navy:#8ea6ff; --green:#5fc472;
+  --loi:#ff9361; --metier:#8ea6ff; --utile:#5fc472; --option:#8a93ab;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1320px;margin:0 auto;padding:28px 20px 64px}
+header{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+h1{font-family:var(--font-display);font-weight:700;font-size:40px;line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
+h1 span{color:var(--green)}
+.lede{margin:8px 0 0;color:var(--muted);max-width:62ch}
+.filters{display:flex;flex-wrap:wrap;gap:8px}
+.filters button{font:500 13px var(--font-body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.filters button[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--option)}
+.s-loi .dot,.dot.loi{background:var(--loi)} .s-metier .dot,.dot.metier{background:var(--metier)}
+.s-utile .dot,.dot.utile{background:var(--utile)} .s-option .dot,.dot.option{background:var(--option)}
+button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+/* map */
+.mapbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:26px 18px;overflow-x:auto}
+.map{position:relative;display:grid;grid-template-columns:1fr auto 1fr;gap:0 56px;align-items:center;min-width:1040px}
+.map svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.map path{fill:none;stroke:var(--line);stroke-width:1.5}
+.map path.main{stroke:var(--navy);stroke-width:2.5;opacity:.55}
+.side{display:flex;flex-direction:column;gap:26px;position:relative;z-index:1}
+.branch{display:flex;align-items:center;gap:40px}
+.side.left .branch{flex-direction:row-reverse}
+.bnode{flex:none;width:150px;font-family:var(--font-display);font-weight:600;font-size:21px;line-height:1.05;padding:10px 12px;border-radius:10px;background:var(--navy);color:var(--surface);text-align:center}
+.bnode small{display:block;font:500 11px var(--font-body);opacity:.8;margin-top:4px;letter-spacing:.02em}
+.leaves{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.side.left .leaves{align-items:flex-end}
+.side.right .leaves{align-items:flex-start}
+.leaf{font:500 13px var(--font-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;text-align:left;max-width:100%}
+.side.left .leaf{flex-direction:row-reverse;text-align:right}
+.leaf:hover{border-color:var(--ink)}
+.leaf.sel{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.leaf.dim{opacity:.22}
+.root{position:relative;z-index:1;width:170px;height:170px;border-radius:50%;background:var(--green);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:var(--font-display);font-weight:700;font-size:30px;line-height:1}
+.root small{font:500 12px var(--font-body);margin-top:6px;opacity:.92;padding:0 14px}
+
+/* fiche */
+.fiche{position:fixed;top:0;right:0;height:100%;width:min(420px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(10,18,40,.18);padding:22px 22px 28px;overflow-y:auto;transform:translateX(105%);transition:transform .2s ease;z-index:10}
+.fiche.open{transform:none}
+@media (prefers-reduced-motion:reduce){.fiche{transition:none}}
+.fiche .close{position:absolute;top:14px;right:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;width:34px;height:34px;font-size:18px;cursor:pointer}
+.fiche .crumb{font:500 12px var(--font-body);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.fiche h2{font-family:var(--font-display);font-size:30px;line-height:1.05;margin:4px 40px 10px 0;text-wrap:balance}
+.pill{display:inline-flex;align-items:center;gap:7px;font:600 12px var(--font-body);border:1px solid currentColor;border-radius:999px;padding:3px 10px}
+.pill.loi{color:var(--loi)} .pill.metier{color:var(--metier)} .pill.utile{color:var(--utile)} .pill.option{color:var(--option)}
+.fiche h3{font:600 12px var(--font-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:18px 0 4px}
+.fiche p{margin:0}
+.fiche .trap{border-left:3px solid var(--loi);padding-left:10px}
+.fiche .ex{background:var(--bg);border-radius:8px;padding:10px 12px;margin-top:18px;font-size:14px}
+.fiche .ex b{font-weight:600}
+.nav{display:flex;gap:8px;margin-top:20px}
+.nav button{flex:1;font:500 13px var(--font-body);padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+
+/* below */
+.below{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:22px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.card h2{font-family:var(--font-display);font-size:24px;margin:0 0 4px;line-height:1.1}
+.card .sub{color:var(--muted);font-size:13.5px;margin:0 0 10px}
+.card ol,.card ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:7px}
+.card li b{font-weight:600}
+.note{margin-top:20px;color:var(--muted);font-size:13px;max-width:90ch}
+
+@media (max-width:760px){
+  h1{font-size:32px}
+  .mapbox{padding:16px 12px;overflow:visible}
+  .map{display:flex;flex-direction:column;min-width:0;gap:18px;align-items:stretch}
+  .map svg{display:none}
+  .root{width:auto;height:auto;border-radius:12px;padding:14px;order:-1}
+  .side{gap:18px}
+  .branch,.side.left .branch{flex-direction:column;align-items:stretch;gap:8px}
+  .bnode{width:auto;text-align:left}
+  .side.left .leaves,.side.right .leaves{align-items:stretch}
+  .side.left .leaf{flex-direction:row;text-align:left}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>CGV de <span>BC Maintenance Services</span></h1>
+      <p class="lede">Toutes les clauses à avoir en tête avant de rédiger, classées par priorité. Cliquer sur une clause ouvre sa fiche : à quoi elle sert, quoi écrire, le piège, et ce que vaut l'article équivalent de l'exemple fourni.</p>
+    </div>
+    <div class="filters" id="filters" role="group" aria-label="Filtrer par priorité"></div>
+  </header>
+
+  <div class="mapbox">
+    <div class="map" id="map">
+      <svg id="links" aria-hidden="true"></svg>
+      <div class="side left" id="left"></div>
+      <div class="root">CGV<small>prestations de maintenance entre professionnels</small></div>
+      <div class="side right" id="right"></div>
+    </div>
+  </div>
+
+  <div class="below">
+    <section class="card">
+      <h2>9 choix à trancher avant d'écrire</h2>
+      <p class="sub">Ce sont des décisions commerciales. Aucun modèle ne les prend à la place de Baptiste.</p>
+      <ol>
+        <li><b>Délai de paiement :</b> 30 jours date de facture, ou 45 jours fin de mois ?</li>
+        <li><b>Taux des pénalités de retard</b> affiché sur les CGV et sur chaque facture.</li>
+        <li><b>Acompte :</b> quel pourcentage, et à partir de quel montant de devis ?</li>
+        <li><b>Cumul des majorations :</b> nuit + non planifié donne +50 % (addition) ou +56 % (multiplication) ?</li>
+        <li><b>Minimum facturable</b> par déplacement et règle d'arrondi des heures.</li>
+        <li><b>Durée de validité</b> d'un devis.</li>
+        <li><b>Garantie sur la main-d'œuvre :</b> quelle durée, quelles exclusions ?</li>
+        <li><b>Plafond de responsabilité :</b> montant de la commande, ou plafond du contrat d'assurance ?</li>
+        <li><b>Droit de publier</b> des photos de chantier et le nom du client.</li>
+      </ol>
+    </section>
+    <section class="card">
+      <h2>À vérifier avec l'assureur</h2>
+      <p class="sub">Les CGV limitent un risque, l'assurance le paie. Les deux doivent dire la même chose.</p>
+      <ul>
+        <li>Le <b>dessin et la fourniture de pièces</b> sont-ils couverts comme activité de conception ?</li>
+        <li>Les <b>matériels emportés en atelier</b> pour remise en état sont-ils couverts comme biens confiés ?</li>
+        <li>La <b>perte d'exploitation du client</b> causée par une intervention est-elle garantie, et jusqu'à quel montant ?</li>
+        <li>La <b>gestion de travaux</b> touche-t-elle au bâtiment ou au génie civil, donc à la garantie décennale ?</li>
+        <li>Le <b>levage et la manutention</b> font-ils partie des activités déclarées ?</li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>Ce que l'exemple apporte, et ce qu'il faut laisser</h2>
+      <p class="sub">L'exemple vend du matériel, une licence logicielle et de l'assistance. Baptiste vend des heures et des chantiers.</p>
+      <ul>
+        <li><b>À reprendre dans l'esprit :</b> hiérarchie des documents (art. 3), réception (19-20), réserve de propriété (24), collaboration du client (43), limitation de responsabilité (51), suspension pour impayé (57), référence commerciale (63), litiges (70-72).</li>
+        <li><b>À laisser :</b> stock, livraison et retours de matériel (7-17), licence et données (9, 40-42), assistance logicielle, mises à jour et astreinte automatisme (25-31), RGPD sous-traitant (56), réversibilité des données (60).</li>
+        <li><b>Absent de l'exemple, vital ici :</b> sécurité sur site, majorations horaires, temps d'attente, renfort d'équipes, pièces fournies par le client.</li>
+      </ul>
+    </section>
+  </div>
+
+  <p class="note">Carte de travail établie à partir de la présentation, de la grille tarifaire 2026 et de l'exemple transmis. Les repères légaux (Code de commerce L441-1 et L441-10, Code du travail R4512-6 et suivants, calendrier de la facture électronique) ont été vérifiés en novembre 2026. Ce n'est pas un avis juridique : la version rédigée mérite une relecture par un avocat, la CCI ou le juriste du cabinet comptable.</p>
+</div>
+
+<aside class="fiche" id="fiche" aria-live="polite" aria-label="Fiche de la clause"></aside>
+
+<script>
+const S={loi:"Obligatoire (loi)",metier:"Vital pour ce métier",utile:"Recommandé",option:"Optionnel"};
+const V={garder:"à reprendre dans l'esprit",adapter:"à adapter fortement",ecarter:"à laisser de côté",absent:"absent de l'exemple"};
+const B=[
+{side:"left",t:"Socle",sub:"qui, pour qui, quel document prime",l:[
+ {t:"Identité du prestataire",s:"loi",why:"Le client doit savoir avec qui il contracte, et ces mentions sont exigées sur tous les documents commerciaux.",write:"Dénomination, forme juridique, capital, siège à Saint-Rieul, numéro SIREN et RCS, TVA intracommunautaire, coordonnées, assureur.",trap:"Des CGV rédigées avant l'immatriculation, avec des champs restés vides.",ex:["absent","Les mentions figurent sur l'offre commerciale, pas dans les CGV."]},
+ {t:"Clients professionnels uniquement",s:"utile",why:"Ferme la porte au droit de la consommation (rétractation, garanties légales), qui exigerait un autre document.",write:"Les CGV s'appliquent aux clients agissant pour leur activité professionnelle : usines d'aliment, organismes stockeurs, carrières.",trap:"Intervenir un jour pour un particulier avec ces CGV : elles ne seraient pas adaptées.",ex:["garder","Art. 2."]},
+ {t:"Hiérarchie des documents",s:"metier",why:"Devis, bon d'intervention, grille tarifaire et CGV peuvent se contredire. Il faut dire lequel l'emporte.",write:"Ordre : devis ou bon d'intervention signé, puis grille tarifaire, puis CGV. Les conditions d'achat du client ne s'appliquent que si BC les a acceptées par écrit.",trap:"Les coopératives et groupes carriers envoient leurs propres conditions d'achat avec le bon de commande. Sans réaction, c'est le conflit de documents, et c'est souvent le droit commun qui s'applique.",ex:["garder","Art. 3, en version courte."]},
+ {t:"Acceptation et opposabilité",s:"metier",why:"Des CGV que le client n'a jamais reçues ne lui sont pas opposables.",write:"CGV jointes à chaque devis, mention « bon pour accord, CGV lues et acceptées » avant la signature, version et date en pied de page.",trap:"Les mettre seulement au dos des factures : la facture arrive après le contrat, trop tard pour prouver l'acceptation.",ex:["garder","Art. 4."]},
+ {t:"Définitions",s:"option",why:"Évite de redéfinir un mot à chaque article.",write:"Six à huit termes : Dépannage, Projet, Devis, Bon d'intervention, Site, Pièces, Réception.",trap:"Recopier la vingtaine de définitions de l'exemple, dont la moitié concerne le logiciel.",ex:["adapter","Lexique final, à réduire des trois quarts."]}
+]},
+{side:"left",t:"Commande",sub:"deux régimes : régie et forfait",l:[
+ {t:"Dépannage en régie",s:"metier",why:"En urgence, personne ne signe de devis. Il faut un mécanisme simple qui vaut commande et qui prouve les heures.",write:"Une demande par téléphone confirmée par e-mail ou SMS vaut commande aux conditions de la grille. Le bon d'intervention signé sur site par le client fait foi des heures et des pièces.",trap:"Pas d'écrit, pas de signature : les heures de nuit sont contestées trois semaines plus tard.",ex:["absent","L'exemple ne connaît que la commande sur offre signée."]},
+ {t:"Projet au forfait",s:"metier",why:"Fixe le périmètre, ce qui est compris et ce qui ne l'est pas.",write:"Devis détaillé avec périmètre, exclusions, planning, durée de validité, acompte. Commande ferme à réception du devis signé.",trap:"Un devis sans liste d'exclusions : tout ce qui n'est pas exclu finit par être réclamé comme inclus.",ex:["adapter","Art. 3 et 4, bon de commande."]},
+ {t:"Travaux supplémentaires",s:"metier",why:"Sur une remise en état, on découvre toujours autre chose une fois la machine ouverte.",write:"Tout travail hors devis fait l'objet d'un accord écrit préalable, même par e-mail. À défaut d'avenant chiffré, facturation en régie selon la grille.",trap:"Faire le supplément « pour rendre service » et tenter de le facturer après.",ex:["garder","Art. 33, mécanisme d'avenant."]},
+ {t:"Annulation et report",s:"utile",why:"Un chantier annulé la veille, c'est une journée perdue et des pièces sur les bras.",write:"Annulation tardive : facturation d'une indemnité et des pièces déjà commandées. Acompte conservé.",trap:"Une indemnité disproportionnée face à un gros client : elle sera négociée ou écartée.",ex:["absent","Non traité."]}
+]},
+{side:"left",t:"Prix",sub:"la grille 2026 rendue contractuelle",l:[
+ {t:"Grille tarifaire annexée",s:"loi",why:"Les CGV entre professionnels doivent contenir les éléments de détermination du prix, comme le barème des prix unitaires.",write:"Renvoi à la grille en annexe : 65 € HT/h chef d'équipe, 60 € technicien, 75 € chef de chantier clé en main, 55 € opérateur en aide aux équipes, 1,15 € HT/km, repas 15 € HT.",trap:"Une grille non datée. Indiquer l'année et la période de validité.",law:"Code de commerce, art. L441-1.",ex:["adapter","Art. 33 et annexe 2."]},
+ {t:"Majorations",s:"metier",why:"C'est là que se joue la marge du dépannage, et là que naissent les contestations.",write:"+20 % non planifié (prise en charge sous 24 h), +30 % nuit de 22 h à 6 h ou samedi, +50 % dimanche et jour férié. Préciser la base de calcul et un exemple chiffré.",trap:"La grille dit « cumulables » sans dire comment. Un dépannage de nuit non prévu vaut +50 % par addition, +56 % par multiplication. À écrire noir sur blanc.",ex:["absent","L'exemple évoque seulement nuits et week-ends, art. 18."]},
+ {t:"Temps facturable",s:"metier",why:"Trajet, attente et arrondis représentent vite 20 % d'une facture de dépannage.",write:"Temps de trajet facturé 50 € HT/h, minimum facturable par déplacement, arrondi à la demi-heure, heures décomptées du départ au retour ou de l'arrivée au départ du site.",trap:"Ne pas définir le point de départ du décompte.",ex:["absent","Non traité."]},
+ {t:"Pièces et fournitures",s:"utile",why:"Le client doit savoir comment sont chiffrées les pièces en régie.",write:"Pièces et consommables facturés en sus, sur devis ou au prix d'achat majoré d'un coefficient annoncé. Frais de port et d'approvisionnement urgent refacturés.",trap:"Avancer des pièces chères sans acompte pour un nouveau client.",ex:["adapter","Art. 7 et 8, partie matériel."]},
+ {t:"Révision des prix",s:"utile",why:"Sans clause, la grille reste figée pour les commandes en cours et les contrats longs.",write:"Grille révisée chaque 1er janvier, communiquée un mois avant. Pour un chantier de plus de six mois, formule d'indexation.",trap:"Une révision « à la discrétion du prestataire » sans préavis : fragile face à un client qui conteste.",ex:["adapter","Art. 34."]}
+]},
+{side:"left",t:"Paiement",sub:"le seul bloc imposé par la loi",l:[
+ {t:"Délai de paiement",s:"loi",why:"Les conditions de règlement sont une mention obligatoire, et le délai est plafonné.",write:"Paiement à 30 jours date de facture. Plafonds légaux : 60 jours après l'émission de la facture, ou 45 jours fin de mois si c'est écrit au contrat.",trap:"Accepter le « 60 jours fin de mois » d'un acheteur : c'est illégal, et c'est la trésorerie de BC qui finance le client.",law:"Code de commerce, art. L441-10. Amende jusqu'à 75 000 € pour une société en cas de CGV non conformes.",ex:["garder","Art. 35."]},
+ {t:"Pénalités de retard",s:"loi",why:"Le taux doit figurer dans les CGV et sur chaque facture.",write:"Taux annuel choisi, au minimum trois fois le taux d'intérêt légal. À défaut de taux écrit, c'est le taux de la BCE majoré de 10 points. Exigibles sans rappel.",trap:"Oublier la mention sur la facture, obligatoire elle aussi.",law:"Code de commerce, art. L441-10 et L441-9.",ex:["garder","Art. 37."]},
+ {t:"Indemnité de 40 €",s:"loi",why:"Indemnité forfaitaire pour frais de recouvrement, due de plein droit par facture en retard.",write:"« Indemnité forfaitaire pour frais de recouvrement : 40 € par facture, indemnisation complémentaire sur justificatifs. »",trap:"La compter par client au lieu de par facture.",law:"Code de commerce, art. L441-10 et D441-5.",ex:["garder","Art. 37."]},
+ {t:"Escompte",s:"loi",why:"Les conditions d'escompte font partie des conditions de règlement à indiquer.",write:"« Aucun escompte pour paiement anticipé. »",trap:"Laisser la mention de côté parce qu'on n'en accorde pas.",ex:["garder","Art. 35."]},
+ {t:"Acompte et situations",s:"metier",why:"Le prévisionnel repose sur un camion et de l'outillage financés par emprunt : la trésorerie ne peut pas porter les chantiers.",write:"Acompte à la commande pour tout projet, pièces coûteuses réglées à la commande, situations mensuelles pour les chantiers de plus d'un mois.",trap:"Démarrer avant encaissement de l'acompte.",ex:["adapter","Art. 35, échéancier."]},
+ {t:"Suspension pour impayé",s:"utile",why:"Donne le droit d'arrêter d'intervenir chez un client qui ne paie pas.",write:"Après mise en demeure restée sans effet, suspension des interventions en cours et exigibilité immédiate de toutes les factures.",trap:"Suspendre sans mise en demeure écrite.",ex:["garder","Art. 57."]},
+ {t:"Facture électronique",s:"loi",why:"BC doit déjà pouvoir recevoir des factures électroniques, et devra en émettre au plus tard le 1er septembre 2027.",write:"Factures transmises par voie électronique via une plateforme agréée. Le client communique son SIREN et son adresse de facturation électronique à la commande.",trap:"Choisir un outil de facturation qui ne sera pas raccordé à une plateforme agréée.",ex:["absent","Exemple antérieur à la réforme."]}
+]},
+{side:"right",t:"Sur site",sub:"le cœur du métier, absent de l'exemple",l:[
+ {t:"Plan de prévention",s:"loi",why:"Toute entreprise extérieure qui intervient dans un établissement doit analyser les risques avec le client avant de commencer.",write:"Le client organise l'inspection commune et transmet ses consignes. Plan écrit dès 400 heures prévisibles sur douze mois ou en cas de travaux dangereux. Pas de démarrage sans ces documents.",trap:"Croire qu'en dessous de 400 heures rien n'est dû : seul l'écrit est conditionné au seuil, l'analyse commune reste obligatoire.",law:"Code du travail, art. R4512-6 et R4512-7, arrêté du 19 mars 1993.",ex:["absent","Non traité."]},
+ {t:"Consignation et permis",s:"metier",why:"Élévateurs, vis, broyeurs, silos : l'accident grave vient d'une énergie non consignée ou d'une poussière qui s'enflamme.",write:"Consignation des énergies par le client ou sous sa responsabilité, attestée par écrit. Permis de feu, zones à risque d'explosion, espaces confinés et travail en hauteur déclarés avant l'intervention.",trap:"Consigner soi-même une installation qu'on ne connaît pas, sans attestation du client.",ex:["absent","Non traité."]},
+ {t:"Obligations du client",s:"metier",why:"La plupart des retards viennent du site : accès fermé, ligne non arrêtée, engin de manutention indisponible.",write:"Accès libre et sécurisé, arrêt de l'installation à l'heure convenue, moyens de manutention et énergies disponibles, interlocuteur présent, informations exactes sur le matériel.",trap:"Ne lister les moyens fournis par le client nulle part : ils deviennent implicitement à la charge de BC.",ex:["garder","Art. 43."]},
+ {t:"Temps d'attente",s:"metier",why:"Une équipe qui attend deux heures qu'on arrête la ligne doit être payée.",write:"Toute attente ou tout déplacement inutile imputable au client est facturé au taux horaire de la grille, déplacement compris.",trap:"Ne pas le faire noter sur le bon d'intervention le jour même.",ex:["absent","Non traité."]},
+ {t:"Droit d'arrêt en cas de danger",s:"utile",why:"Permet de refuser ou d'interrompre une intervention dangereuse sans être en faute contractuelle.",write:"BC peut suspendre l'intervention si les conditions de sécurité ne sont pas réunies, sans pénalité, les heures passées restant dues.",trap:"Céder à la pression d'un client à l'arrêt.",ex:["absent","Non traité."]},
+ {t:"Renfort d'équipes",s:"metier",why:"« Renfort des équipes techniques » ressemble à de la mise à disposition de personnel, activité réservée à l'intérim dès qu'il y a des salariés.",write:"BC exécute une prestation définie, avec ses méthodes et son outillage, et garde seule l'autorité sur son personnel. Pas d'intégration aux équipes du client.",trap:"Facturer des heures d'un salarié placé sous les ordres du client : risque de prêt de main-d'œuvre illicite. Point à faire valider avant la première embauche.",law:"Code du travail, art. L8241-1 et L8231-1.",ex:["absent","L'art. 61 traite seulement de l'indépendance des parties."]},
+ {t:"Sous-traitance",s:"utile",why:"Usinage, électricité, automatisme, maçonnerie : une partie des projets passe par des partenaires.",write:"BC peut sous-traiter tout ou partie de la prestation et reste responsable vis-à-vis du client.",trap:"Certains clients exigent d'agréer chaque sous-traitant : le prévoir au devis.",ex:["garder","Art. 62."]}
+]},
+{side:"right",t:"Résultat",sub:"ce qui est promis, ce qui est garanti",l:[
+ {t:"Moyens ou résultat",s:"metier",why:"Détermine qui doit prouver quoi si la panne revient.",write:"Diagnostic et dépannage : obligation de moyens. Projet clé en main : résultat limité au périmètre et aux performances écrits au devis.",trap:"Promettre oralement « ça repartira » sur une machine de trente ans.",ex:["adapter","Art. 49."]},
+ {t:"Délais",s:"utile",why:"Un retard sur un arrêt technique peut coûter cher au client, qui cherchera à le refacturer.",write:"Délais d'intervention indicatifs en dépannage. Planning contractuel en projet, décalé de plein droit en cas de retard du client ou d'un fournisseur de pièces. Pas de pénalité sans accord écrit.",trap:"Signer le contrat type d'un client qui prévoit des pénalités de retard journalières.",ex:["adapter","Art. 11."]},
+ {t:"Réception",s:"metier",why:"C'est le point de départ de la garantie, du solde à payer et du transfert des risques.",write:"Procès-verbal ou bon de fin d'intervention signé. Sans réserve écrite sous quelques jours, ou dès la remise en production, la prestation est réputée acceptée.",trap:"Partir du site sans signature.",ex:["garder","Art. 19 et 20."]},
+ {t:"Garantie main-d'œuvre",s:"metier",why:"Le client demandera combien de temps l'intervention est garantie. Mieux vaut l'avoir écrit.",write:"Durée limitée à compter de la réception, reprise gratuite de la prestation défectueuse. Exclusions : usure normale, mauvaise utilisation, défaut d'entretien, intervention d'un tiers.",trap:"Aucune durée écrite : le client invoquera le droit commun, plus long et plus flou.",ex:["adapter","Art. 21."]},
+ {t:"Pièces neuves",s:"utile",why:"BC revend des pièces de fournisseurs et n'en maîtrise pas la fabrication.",write:"Garantie du fabricant répercutée au client, sans extension.",trap:"Les vices cachés ne s'écartent pas par une clause quand on vend à un client d'une autre spécialité.",ex:["adapter","Art. 21 et annexes 3 et 4."]},
+ {t:"Pièces dessinées par BC",s:"metier",why:"Dessiner une pièce fait de BC un concepteur, avec une responsabilité plus lourde que celle d'un poseur.",write:"Pièce conçue selon les données et contraintes fournies par le client, validée par lui avant fabrication. Plans restant la propriété de BC.",trap:"Une assurance qui couvre la maintenance mais pas la conception.",ex:["absent","Proche des art. 32 et 39 sur les développements spécifiques."]},
+ {t:"Matériel remis en état",s:"utile",why:"Un écluse ou un réducteur reconditionné n'offre pas la tenue d'un neuf.",write:"Remise en état selon le périmètre du devis, garantie limitée aux éléments remplacés, état initial constaté par photos.",trap:"Ne pas documenter l'état à l'ouverture.",ex:["absent","Non traité."]},
+ {t:"Pièces fournies par le client",s:"metier",why:"Fréquent en usine : le client sort la pièce de son magasin.",write:"Aucune garantie sur les pièces fournies par le client, ni sur les conséquences de leur défaut. Temps perdu facturé.",trap:"Monter une pièce douteuse sans réserve écrite.",ex:["absent","Non traité."]}
+]},
+{side:"right",t:"Risques",sub:"ce qui peut couler l'entreprise",l:[
+ {t:"Plafond de responsabilité",s:"metier",why:"Une heure d'arrêt d'une usine d'aliment coûte plus que la facture de l'intervention. Sans plafond, un sinistre dépasse le chiffre d'affaires annuel.",write:"Responsabilité limitée à un montant défini. Exclusion des dommages indirects, en premier lieu les pertes d'exploitation et de production.",trap:"Le plafond ne joue pas en cas de faute lourde ou de dommage corporel, et un plafond dérisoire peut être écarté par le juge. Le calibrer sur l'assurance.",law:"Code civil, art. 1170 et 1231-3. Code de commerce, art. L442-1.",ex:["garder","Art. 51. C'est la clause la plus utile de l'exemple."]},
+ {t:"Assurance RC professionnelle",s:"metier",why:"Les clients industriels demandent l'attestation avant de laisser entrer sur site.",write:"Attestation annuelle annexée, activités déclarées conformes à ce qui est vendu.",trap:"Une activité vendue mais non déclarée à l'assureur n'est pas couverte.",ex:["garder","Art. 52 et annexe 5."]},
+ {t:"Garantie décennale",s:"utile",why:"La « gestion de travaux » peut toucher au bâtiment ou au génie civil, où l'assurance décennale est obligatoire.",write:"Rien dans les CGV tant que le périmètre n'est pas clarifié. Les équipements de process à usage purement professionnel sont en principe hors décennale.",trap:"Piloter un lot maçonnerie ou charpente sans assurance adaptée.",law:"Code civil, art. 1792 et 1792-7.",ex:["absent","Non traité."]},
+ {t:"Réserve de propriété",s:"utile",why:"Permet de revendiquer les pièces impayées si le client fait défaut.",write:"Les pièces restent la propriété de BC jusqu'au paiement complet. Clause acceptée par écrit au plus tard à la livraison.",trap:"Une pièce soudée ou intégrée à la machine ne se récupère plus en pratique.",law:"Code civil, art. 2367 et 2368.",ex:["garder","Art. 24."]},
+ {t:"Biens confiés",s:"metier",why:"Les matériels emportés pour remise en état sont sous la garde de BC, transport compris.",write:"État constaté à l'enlèvement, responsabilité limitée à la valeur d'usage, matériel non repris après relance facturé en stockage.",trap:"Transporter un matériel du client sans que l'assurance couvre les biens confiés.",ex:["adapter","Art. 22 et 23."]},
+ {t:"Force majeure",s:"utile",why:"Exonère en cas d'événement imprévisible et irrésistible.",write:"Renvoi à la définition légale, plus quelques cas propres : rupture d'approvisionnement de pièces, intempéries empêchant le travail en extérieur.",trap:"Une liste trop large, qui ne tiendra pas.",law:"Code civil, art. 1218.",ex:["garder","Art. 53 et 54."]}
+]},
+{side:"right",t:"Fin et litiges",sub:"sortir proprement d'une relation",l:[
+ {t:"Résiliation pour faute",s:"utile",why:"Fixe la marche à suivre quand l'une des parties ne tient pas ses engagements.",write:"Mise en demeure écrite, délai pour y remédier, puis résiliation. Les prestations réalisées restent dues.",trap:"Quitter un chantier sans mise en demeure.",ex:["garder","Art. 58 et 59."]},
+ {t:"Confidentialité",s:"utile",why:"BC voit les formules, les débits et les process de clients concurrents entre eux.",write:"Engagement réciproque, limité dans le temps, sur les informations techniques et commerciales.",trap:"Un texte de deux pages pour une TPE.",ex:["adapter","Art. 47, à réduire."]},
+ {t:"Plans et savoir-faire",s:"utile",why:"Les plans de pièces et les méthodes sont l'actif immatériel de BC.",write:"BC reste propriétaire de ses plans, études et méthodes. Le client reçoit un droit d'usage pour ses propres installations.",trap:"Remettre les plans natifs sans clause : le client fera refaire la pièce ailleurs.",ex:["adapter","Art. 39. Laisser les art. 40 à 42 sur la licence."]},
+ {t:"Référence et photos",s:"utile",why:"La présentation commerciale montre déjà des photos prises chez des clients.",write:"Autorisation de citer le client comme référence et d'utiliser des photos des travaux, sauf refus écrit.",trap:"Publier une photo de site industriel sans accord : les carrières et usines y sont sensibles.",ex:["garder","Art. 63."]},
+ {t:"Non-sollicitation",s:"option",why:"Protège contre le débauchage d'un technicien par le client.",write:"Interdiction réciproque d'embaucher le personnel de l'autre pendant le contrat et un an après. Utile à partir de la première embauche.",trap:"Une indemnité excessive, qui sera réduite par le juge.",ex:["adapter","Art. 46."]},
+ {t:"Données personnelles",s:"option",why:"BC ne traite que les coordonnées de ses contacts chez les clients.",write:"Deux lignes : finalité de gestion de la relation commerciale, droits d'accès et de rectification, adresse de contact.",trap:"Recopier le régime de sous-traitant de l'exemple, sans objet ici.",ex:["ecarter","Art. 55 suffit en version courte. Art. 56 à laisser."]},
+ {t:"Droit applicable et tribunal",s:"metier",why:"Évite d'aller plaider au siège d'un client à l'autre bout de la France.",write:"Droit français. Tentative de règlement amiable, puis compétence du tribunal de commerce du siège de BC, à vérifier pour Saint-Rieul. Clause écrite de façon très apparente.",trap:"La clause de compétence ne vaut qu'entre commerçants et doit être bien visible.",law:"Code de procédure civile, art. 48.",ex:["garder","Art. 70 à 72."]},
+ {t:"Clauses de style",s:"option",why:"Nullité partielle, tolérance, cession, preuve par e-mail : elles ferment de petites portes.",write:"Un seul article « Dispositions diverses » de cinq lignes. Garder surtout la preuve par e-mail et bon d'intervention numérique.",trap:"Y consacrer huit articles.",ex:["adapter","Art. 61 et 64 à 69."]}
+]}
+];
+
+const flat=[];
+function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+B.forEach(b=>{
+  const host=document.getElementById(b.side);
+  const br=el("div","branch");
+  const node=el("div","bnode",b.t);node.appendChild(el("small",null,b.sub));
+  const leaves=el("div","leaves");
+  b.l.forEach(l=>{
+    const btn=el("button","leaf s-"+l.s);btn.type="button";
+    btn.appendChild(el("span","dot"));btn.appendChild(el("span",null,l.t));
+    const i=flat.length;flat.push({b,l,btn});
+    btn.addEventListener("click",()=>show(i));
+    leaves.appendChild(btn);
+  });
+  br.appendChild(node);br.appendChild(leaves);host.appendChild(br);b.node=node;
+});
+
+/* filters */
+const fbox=document.getElementById("filters");let cur="all";
+[["all","Tout"],...Object.entries(S)].forEach(([k,label])=>{
+  const b=el("button");b.type="button";b.id="f-"+k;
+  if(k!=="all")b.appendChild(el("span","dot "+k));
+  const n=k==="all"?flat.length:flat.filter(f=>f.l.s===k).length;
+  b.appendChild(el("span",null,label+" · "+n));
+  b.setAttribute("aria-pressed",k==="all");
+  b.addEventListener("click",()=>{cur=k;[...fbox.children].forEach(c=>c.setAttribute("aria-pressed",c===b));
+    flat.forEach(f=>f.btn.classList.toggle("dim",k!=="all"&&f.l.s!==k));});
+  fbox.appendChild(b);
+});
+
+/* fiche */
+const fiche=document.getElementById("fiche");let open=-1;
+function sec(title,text,cls){const f=document.createDocumentFragment();f.appendChild(el("h3",null,title));f.appendChild(el("p",cls||null,text));return f}
+function show(i){
+  open=i;const {b,l}=flat[i];
+  flat.forEach((f,j)=>f.btn.classList.toggle("sel",j===i));
+  fiche.textContent="";
+  const x=el("button","close","×");x.type="button";x.setAttribute("aria-label","Fermer la fiche");x.addEventListener("click",hide);
+  fiche.appendChild(x);
+  fiche.appendChild(el("div","crumb",b.t));
+  fiche.appendChild(el("h2",null,l.t));
+  const p=el("span","pill "+l.s);p.appendChild(el("span","dot "+l.s));p.appendChild(el("span",null,S[l.s]));fiche.appendChild(p);
+  fiche.appendChild(sec("À quoi ça sert",l.why));
+  fiche.appendChild(sec("Quoi écrire pour BC",l.write));
+  fiche.appendChild(sec("Le piège",l.trap,"trap"));
+  if(l.law)fiche.appendChild(sec("Repère légal",l.law));
+  const ex=el("div","ex");const bb=el("b",null,"Dans l'exemple : "+V[l.ex[0]]+". ");ex.appendChild(bb);ex.appendChild(document.createTextNode(l.ex[1]));fiche.appendChild(ex);
+  const nav=el("div","nav");
+  const pv=el("button",null,"← Précédente");pv.type="button";pv.addEventListener("click",()=>show((i-1+flat.length)%flat.length));
+  const nx=el("button",null,"Suivante →");nx.type="button";nx.addEventListener("click",()=>show((i+1)%flat.length));
+  nav.appendChild(pv);nav.appendChild(nx);fiche.appendChild(nav);
+  fiche.classList.add("open");fiche.scrollTop=0;
+}
+function hide(){fiche.classList.remove("open");flat.forEach(f=>f.btn.classList.remove("sel"));open=-1}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")hide();
+  if(open>=0&&e.key==="ArrowRight")show((open+1)%flat.length);
+  if(open>=0&&e.key==="ArrowLeft")show((open-1+flat.length)%flat.length);});
+
+/* connectors */
+const map=document.getElementById("map"),svg=document.getElementById("links"),rootEl=map.querySelector(".root");
+function draw(){
+  const m=map.getBoundingClientRect();svg.textContent="";
+  if(getComputedStyle(svg).display==="none")return;
+  svg.setAttribute("viewBox","0 0 "+m.width+" "+m.height);
+  const r=rootEl.getBoundingClientRect(),cx=r.left+r.width/2-m.left,cy=r.top+r.height/2-m.top;
+  const add=(x1,y1,x2,y2,cls)=>{const p=document.createElementNS("http://www.w3.org/2000/svg","path");const mx=(x1+x2)/2;
+    p.setAttribute("d",`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);if(cls)p.setAttribute("class",cls);svg.appendChild(p)};
+  B.forEach(b=>{
+    const n=b.node.getBoundingClientRect(),L=b.side==="left";
+    const nIn=(L?n.right:n.left)-m.left,nOut=(L?n.left:n.right)-m.left,ny=n.top+n.height/2-m.top;
+    add(cx+(L?-1:1)*r.width/2*0.92,cy+(ny-cy)*0.22,nIn,ny,"main");
+    flat.filter(f=>f.b===b).forEach(f=>{const q=f.btn.getBoundingClientRect();
+      add(nOut,ny,(L?q.right:q.left)-m.left,q.top+q.height/2-m.top)});
+  });
+}
+draw();addEventListener("resize",draw);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
+</script>
+</body>
+</html>
