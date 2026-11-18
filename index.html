@@ -95,6 +95,21 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offs
 .card li b{font-weight:600}
 .note{margin-top:20px;color:var(--muted);font-size:13px;max-width:90ch}
 
+.vue{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface);margin-bottom:12px}
+.vue button{font:600 13px var(--font-body);color:var(--muted);background:none;border:0;border-radius:999px;padding:6px 16px;cursor:pointer}
+.vue button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+
+/* Vue liste : même mise en page que sur téléphone */
+.liste .mapbox{padding:16px 12px;overflow:visible}
+.liste .map{display:flex;flex-direction:column;min-width:0;gap:18px;align-items:stretch}
+.liste .map svg{display:none}
+.liste .root{width:auto;height:auto;border-radius:12px;padding:14px;order:-1}
+.liste .side{gap:18px}
+.liste .branch,.liste .side.left .branch{flex-direction:column;align-items:stretch;gap:8px}
+.liste .bnode{width:auto;text-align:left}
+.liste .side.left .leaves,.liste .side.right .leaves{align-items:stretch}
+.liste .side.left .leaf{flex-direction:row;text-align:left}
+
 @media (max-width:760px){
   h1{font-size:32px}
   .mapbox{padding:16px 12px;overflow:visible}
@@ -119,6 +134,10 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offs
     <div class="filters" id="filters" role="group" aria-label="Filtrer par priorité"></div>
   </header>
 
+  <div class="vue" role="group" aria-label="Affichage">
+    <button type="button" id="v-carte" aria-pressed="true">Carte</button>
+    <button type="button" id="v-liste" aria-pressed="false">Liste</button>
+  </div>
   <div class="mapbox">
     <div class="map" id="map">
       <svg id="links" aria-hidden="true"></svg>
@@ -319,6 +338,13 @@ function draw(){
   });
 }
 draw();addEventListener("resize",draw);
+const wrap=document.querySelector(".wrap");
+[["v-carte",false],["v-liste",true]].forEach(([id,liste])=>document.getElementById(id).addEventListener("click",()=>{
+  wrap.classList.toggle("liste",liste);
+  document.getElementById("v-carte").setAttribute("aria-pressed",!liste);
+  document.getElementById("v-liste").setAttribute("aria-pressed",liste);
+  draw();
+}));
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
 </script>
 </body>
